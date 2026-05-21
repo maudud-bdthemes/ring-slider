@@ -113,6 +113,8 @@ body {
   width: max-content;
   overflow: visible;
   will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
 }
 
 .card {
@@ -123,6 +125,8 @@ body {
   overflow: hidden;
   transform-origin: center center;
   will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
   /* background: #0a0a0a; */
   cursor: pointer;
 }
@@ -418,37 +422,12 @@ body.reaction-shake {
       }
     },
     images: [
-      { key: 'forest-ridge', src: 'https://picsum.photos/id/1011/800/800', alt: 'Forest ridge above a valley' },
-      { key: 'mountain-road', src: 'https://picsum.photos/id/1027/800/800', alt: 'Mountain road portrait' },
-      { key: 'beach-cliffs', src: 'https://picsum.photos/id/1005/800/800', alt: 'Beach cliffs at sunset' },
-      { key: 'river-canyon', src: 'https://picsum.photos/id/1035/800/800', alt: 'River canyon landscape' },
-      { key: 'misty-hills', src: 'https://picsum.photos/id/1015/800/800', alt: 'Misty hills and trees' },
-      { key: 'desert-sky', src: 'https://picsum.photos/id/1025/800/800', alt: 'Desert sky and horizon' },
-      { key: 'snow-peak', src: 'https://picsum.photos/id/1039/800/800', alt: 'Snow covered mountain peak' },
-      { key: 'green-lake', src: 'https://picsum.photos/id/1020/800/800', alt: 'Green lake and rocks' },
-      { key: 'forest-path', src: 'https://picsum.photos/id/1032/800/800', alt: 'Forest walking path' },
-      { key: 'coastal-hill', src: 'https://picsum.photos/id/1036/800/800', alt: 'Coastal hill landscape' },
-      { key: 'wooded-valley', src: 'https://picsum.photos/id/1038/800/800', alt: 'Wooded valley' },
-      { key: 'ocean-rocks', src: 'https://picsum.photos/id/1060/800/800', alt: 'Ocean rocks and waves' },
-      { key: 'autumn-water', src: 'https://picsum.photos/id/1061/800/800', alt: 'Autumn water scene' },
-      { key: 'highland-trail', src: 'https://picsum.photos/id/1062/800/800', alt: 'Highland trail' },
-      { key: 'golden-field', src: 'https://picsum.photos/id/1074/800/800', alt: 'Golden field' },
-      { key: 'rocky-coast', src: 'https://picsum.photos/id/1070/800/800', alt: 'Rocky coast' },
-      { key: 'pine-ridge', src: 'https://picsum.photos/id/1072/800/800', alt: 'Pine ridge' },
-      { key: 'sunny-hillside', src: 'https://picsum.photos/id/1040/800/800', alt: 'Sunny hillside' },
-      { key: 'blue-water', src: 'https://picsum.photos/id/1043/800/800', alt: 'Blue water landscape' },
-      { key: 'quiet-lake', src: 'https://picsum.photos/id/1044/800/800', alt: 'Quiet lake' },
-      { key: 'mountain-lake', src: 'https://picsum.photos/id/1045/800/800', alt: 'Mountain lake' },
-      { key: 'city-bridge', src: 'https://picsum.photos/id/1080/800/800', alt: 'City bridge' },
-      { key: 'evening-street', src: 'https://picsum.photos/id/1084/800/800', alt: 'Evening street' },
-      { key: 'green-woods', src: 'https://picsum.photos/id/1082/800/800', alt: 'Green woods' },
-      { key: 'open-road', src: 'https://picsum.photos/id/1081/800/800', alt: 'Open road' },
-      { key: 'quiet-forest', src: 'https://picsum.photos/id/1083/800/800', alt: 'Quiet forest' },
-      { key: 'stone-path', src: 'https://picsum.photos/id/1021/800/800', alt: 'Stone path' },
-      { key: 'sunlit-trees', src: 'https://picsum.photos/id/1022/800/800', alt: 'Sunlit trees' },
-      { key: 'blue-mountain', src: 'https://picsum.photos/id/1023/800/800', alt: 'Blue mountain' },
-      { key: 'river-stones', src: 'https://picsum.photos/id/1024/800/800', alt: 'River stones' },
-      { key: 'foggy-shore', src: 'https://picsum.photos/id/1026/800/800', alt: 'Foggy shore' }
+      { key: 'forest-ridge', src: '01.jpg', alt: 'Forest ridge above a valley' },
+      { key: 'mountain-road', src: '02.jpg', alt: 'Mountain road portrait' },
+      { key: 'forest-ridge', src: '03.jpg', alt: 'Forest ridge above a valley' },
+      { key: 'mountain-road', src: '04.jpg', alt: 'Mountain road portrait' },
+      { key: 'forest-ridge', src: '05.jpg', alt: 'Forest ridge above a valley' },
+      { key: 'mountain-road', src: '06.jpg', alt: 'Mountain road portrait' },
     ],
     rows: [
       {
@@ -485,6 +464,11 @@ body.reaction-shake {
         zBase: 300
       }
     ]
+  };
+
+  var stageMetrics = {
+    centerX: 0,
+    half: 1
   };
 
   function bell(dist) {
@@ -552,36 +536,124 @@ body.reaction-shake {
     return cards;
   }
 
-  function layoutRow(rowConfig, cards) {
+  function updateStageMetrics() {
     var rect = stage.getBoundingClientRect();
-    var centerX = rect.left + rect.width * 0.5;
-    var half = rect.width * 0.48;
-    var base = sliderData.settings.cardSize;
-    var i, card, box, cx, dist, t, scale, ty, spread;
+    stageMetrics.centerX = rect.left + rect.width * 0.5;
+    stageMetrics.half = rect.width * 0.48;
+  }
 
-    for (i = 0; i < cards.length; i++) {
-      card = cards[i];
-      box = card.getBoundingClientRect();
-      cx = box.left + box.width * 0.5;
+  /* Map continuous scroll to (-loopWidth, 0] for display — no state mutation */
+  function wrapToLoop(x, loopWidth) {
+    if (loopWidth <= 0) return x;
+    var wrapped = x % loopWidth;
+    if (wrapped > 0) wrapped -= loopWidth;
+    return wrapped;
+  }
+
+  function getDisplayScroll(row) {
+    return wrapToLoop(row.renderedScrollX, row.loopWidth);
+  }
+
+  /* Shift both scroll values together to prevent float drift — zero visual change */
+  function normalizeScrollState(row) {
+    var w = row.loopWidth;
+    var offset;
+
+    if (w <= 0) return;
+    if (Math.abs(row.scrollX) < w * 2 && Math.abs(row.renderedScrollX) < w * 2) return;
+
+    offset = w * Math.trunc(row.scrollX / w);
+    if (offset === 0) return;
+
+    row.scrollX -= offset;
+    row.renderedScrollX -= offset;
+    if (row.dragging) row.dragStartScroll -= offset;
+  }
+
+  function measureRowTrackOrigin(row) {
+    row.baseTrackLeft = row.track.getBoundingClientRect().left - getDisplayScroll(row);
+  }
+
+  function getCardCenterX(index, trackLeft, base, gap, spreads) {
+    var left = trackLeft + spreads[0] + index * (base + gap);
+    var k;
+
+    if (index > 0) {
+      for (k = 1; k <= index; k++) {
+        left += spreads[k - 1] + spreads[k];
+      }
+    }
+
+    return left + base * 0.5;
+  }
+
+  function layoutRow(rowConfig, row) {
+    var cards = row.cards;
+    var base = sliderData.settings.cardSize;
+    var gap = sliderData.settings.gap;
+    var stepSize = row.stepSize;
+    var scrollX = getDisplayScroll(row);
+    var trackLeft = row.baseTrackLeft + scrollX;
+    var centerX = stageMetrics.centerX;
+    var half = stageMetrics.half;
+    var count = cards.length;
+    var spreads = row.__spreads || (row.__spreads = new Float64Array(count));
+    var scales = row.__scales || (row.__scales = new Float64Array(count));
+    var tys = row.__tys || (row.__tys = new Float64Array(count));
+    var pass, i, card, cx, dist, t, scale, ty, spread, offsetX, gridCx, zIndex;
+
+    /* Pass 1: estimate compression from uniform grid (matches original first-pass positions) */
+    for (i = 0; i < count; i++) {
+      cx = trackLeft + i * stepSize + base * 0.5;
       dist = Math.min(1, Math.abs(cx - centerX) / half);
       t = bell(dist);
+      scales[i] = rowConfig.scaleMin + t * (rowConfig.scaleMax - rowConfig.scaleMin);
+      spreads[i] = (base * (1 - scales[i])) * -0.5;
+    }
 
-      scale = rowConfig.scaleMin + t * (rowConfig.scaleMax - rowConfig.scaleMin);
+    /* Pass 2–3: refine arc/scale using margin-compressed card centers (original overlap model) */
+    for (pass = 0; pass < 2; pass++) {
+      for (i = 0; i < count; i++) {
+        cx = getCardCenterX(i, trackLeft, base, gap, spreads);
+        dist = Math.min(1, Math.abs(cx - centerX) / half);
+        t = bell(dist);
+        scale = rowConfig.scaleMin + t * (rowConfig.scaleMax - rowConfig.scaleMin);
+        spreads[i] = (base * (1 - scale)) * -0.5;
 
-      if (rowConfig.type === 'top') {
-        ty = rowConfig.arc * (dist * dist - t);
-      } else if (rowConfig.type === 'bottom') {
-        ty = rowConfig.arc * (t - dist * dist);
-      } else {
-        ty = 0;
+        if (rowConfig.type === 'top') {
+          tys[i] = rowConfig.arc * (dist * dist - t);
+        } else if (rowConfig.type === 'bottom') {
+          tys[i] = rowConfig.arc * (t - dist * dist);
+        } else {
+          tys[i] = 0;
+        }
+
+        scales[i] = scale;
+      }
+    }
+
+    /* Apply: margin-equivalent compression via transform offset (same visual, no flex reflow) */
+    for (i = 0; i < count; i++) {
+      card = cards[i];
+      gridCx = trackLeft + i * stepSize + base * 0.5;
+      cx = getCardCenterX(i, trackLeft, base, gap, spreads);
+      offsetX = cx - gridCx;
+      ty = tys[i];
+      scale = scales[i];
+
+      if (card.__offsetX !== offsetX || card.__ty !== ty || card.__scale !== scale) {
+        card.__offsetX = offsetX;
+        card.__ty = ty;
+        card.__scale = scale;
+        card.style.transform =
+          'translate3d(' + offsetX + 'px,' + ty + 'px,0) scale(' + scale + ')';
       }
 
-      spread = (base * (1 - scale)) * -0.5;
-
-      card.style.marginLeft = spread + 'px';
-      card.style.marginRight = spread + 'px';
-      card.style.transform = 'translateY(' + ty + 'px) scale(' + scale + ')';
-      card.style.zIndex = String(rowConfig.zBase + Math.round(t * 80));
+      zIndex = rowConfig.zBase + Math.round(bell(Math.min(1, Math.abs(cx - centerX) / half)) * 80);
+      if (card.__zIndex !== zIndex) {
+        card.__zIndex = zIndex;
+        card.style.zIndex = String(zIndex);
+      }
     }
   }
 
@@ -650,6 +722,7 @@ body.reaction-shake {
       cards: buildRow(track),
       stepSize: sliderData.settings.cardSize + sliderData.settings.gap,
       loopWidth: 0,
+      baseTrackLeft: 0,
       scrollX: 0,
       renderedScrollX: 0,
       springVelocity: 0,
@@ -797,51 +870,58 @@ body.reaction-shake {
     }
   });
 
-  function measureLoopWidth(track) {
-    var kids = track.children;
-    var half = kids.length / 2;
-    if (!half) return track.scrollWidth / 2;
-    return kids[half].offsetLeft - kids[0].offsetLeft;
+  function measureLoopWidth(row) {
+    var cardsPerLoop = row.cards.length / sliderData.settings.repeatCount;
+    return cardsPerLoop * row.stepSize;
   }
 
   var scrollReady = false;
+  var initScrollFrame = 0;
+
+  function scheduleInitScroll() {
+    if (initScrollFrame) return;
+    initScrollFrame = requestAnimationFrame(function () {
+      initScrollFrame = 0;
+      initScroll();
+    });
+  }
 
   function initScroll() {
-    rows.forEach(function (r) {
-      var w = measureLoopWidth(r.track);
-      if (!w) return;
-      r.loopWidth = w;
+    updateStageMetrics();
 
-      if (!scrollReady && r.config.initialOffset) {
-        r.scrollX = r.loopWidth * r.config.initialOffset;
+    rows.forEach(function (r) {
+      var prevLoop = r.loopWidth;
+      var w = measureLoopWidth(r);
+      if (!w) return;
+
+      if (!scrollReady) {
+        r.loopWidth = w;
+        if (r.config.initialOffset) {
+          r.scrollX = w * r.config.initialOffset;
+          r.renderedScrollX = r.scrollX;
+        }
+        r.springVelocity = 0;
+      } else if (prevLoop > 0 && prevLoop !== w) {
+        var phase = wrapToLoop(r.scrollX, prevLoop);
+        var correction = phase - wrapToLoop(r.scrollX, w);
+        r.scrollX += correction;
+        r.renderedScrollX += correction;
+        r.loopWidth = w;
+      } else {
+        r.loopWidth = w;
       }
 
-      wrapScroll(r, false);
-      r.renderedScrollX = r.scrollX;
-      r.springVelocity = 0;
       r.viewportWidth = stage.clientWidth || window.innerWidth || 1;
-
-      r.autoVelocity = (r.loopWidth / r.config.durationSec) * r.config.direction;
+      r.autoVelocity = (w / r.config.durationSec) * r.config.direction;
       applyTrackX(r);
+      measureRowTrackOrigin(r);
     });
     scrollReady = true;
   }
 
   function applyTrackX(r) {
-    r.track.style.transform = 'translateX(' + r.renderedScrollX + 'px)';
-  }
-
-  /* keep scroll in (-loopWidth, 0] — seamless infinite loop */
-  function wrapScroll(r, adjustDrag) {
-    if (r.loopWidth <= 0) return;
-    while (r.scrollX <= -r.loopWidth) {
-      r.scrollX += r.loopWidth;
-      if (adjustDrag) r.dragStartScroll += r.loopWidth;
-    }
-    while (r.scrollX > 0) {
-      r.scrollX -= r.loopWidth;
-      if (adjustDrag) r.dragStartScroll -= r.loopWidth;
-    }
+    var x = getDisplayScroll(r);
+    r.track.style.transform = 'translate3d(' + x + 'px,0,0)';
   }
 
   /* per-row drag */
@@ -880,7 +960,6 @@ body.reaction-shake {
       );
       r.lastDragX = e.clientX;
       r.lastDragTime = now;
-      wrapScroll(r, true);
       e.preventDefault();
     }
 
@@ -895,7 +974,6 @@ body.reaction-shake {
       if (Math.abs(r.momentumVelocity) < dragConfig.minMomentumVelocity) {
         r.momentumVelocity = 0;
       }
-      wrapScroll(r, false);
       try { r.clip.releasePointerCapture(e.pointerId); } catch (err) {}
 
       if (r.dragStartCard && totalDrag <= dragConfig.clickMaxDistance) {
@@ -932,28 +1010,16 @@ body.reaction-shake {
       r.springVelocity = 0;
     }
 
-    wrapRenderedScroll(r);
     applyTrackX(r);
   }
 
-  function wrapRenderedScroll(r) {
-    if (r.loopWidth <= 0) return;
-    while (r.renderedScrollX <= -r.loopWidth) {
-      r.renderedScrollX += r.loopWidth;
-    }
-    while (r.renderedScrollX > 0) {
-      r.renderedScrollX -= r.loopWidth;
-    }
-  }
-
   function getShortestLoopDelta(r, fromX, toX) {
-    var delta = toX - fromX;
+    var w = r.loopWidth;
+    var delta;
 
-    if (r.loopWidth <= 0) return delta;
-    if (delta > r.loopWidth * 0.5) delta -= r.loopWidth;
-    if (delta < -r.loopWidth * 0.5) delta += r.loopWidth;
-
-    return delta;
+    if (w <= 0) return toX - fromX;
+    delta = toX - fromX;
+    return delta - w * Math.round(delta / w);
   }
 
   function tick(time) {
@@ -967,31 +1033,31 @@ body.reaction-shake {
         if (Math.abs(r.momentumVelocity) < sliderData.settings.drag.minMomentumVelocity) {
           r.momentumVelocity = 0;
         }
-        wrapScroll(r);
       }
 
       updateRenderedScroll(r, dt);
+      normalizeScrollState(r);
     });
 
     rows.forEach(function (r) {
-      layoutRow(r.config, r.cards);
+      layoutRow(r.config, r);
     });
 
     requestAnimationFrame(tick);
   }
 
   initScroll();
-  window.addEventListener('load', initScroll);
+  window.addEventListener('load', scheduleInitScroll);
 
   rows.forEach(function (r) {
     r.track.querySelectorAll('img').forEach(function (img) {
-      img.addEventListener('load', initScroll);
+      img.addEventListener('load', scheduleInitScroll);
     });
   });
 
   if (typeof ResizeObserver !== 'undefined') {
-    var ro = new ResizeObserver(initScroll);
-    rows.forEach(function (r) { ro.observe(r.track); });
+    var ro = new ResizeObserver(scheduleInitScroll);
+    ro.observe(stage);
   }
 
   requestAnimationFrame(tick);
