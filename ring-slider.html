@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  /* background: #000; */
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100vw;
+  max-width: 1720px;
+  padding: 110px 0;
+  overflow: visible;
+  line-height: 0;
+}
+
+/* overflow-x: clip avoids the hidden+visible bug that clips Y */
+.row-clip {
+  position: relative;
+  width: 100%;
+  overflow-x: clip;
+  overflow-y: visible;
+  margin: 0;
+  line-height: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.row-clip.is-dragging {
+  cursor: grabbing;
+}
+
+.row-clip.top {
+  margin-bottom: -95px;
+  z-index: 3;
+}
+
+.row-clip.middle {
+  margin-bottom: -95px;
+  z-index: 1;
+}
+
+.row-clip.bottom {
+  z-index: 3;
+}
+
+.row-clip::before,
+.row-clip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18vw;
+  max-width: 280px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.row-clip::before {
+  left: 0;
+  background: linear-gradient(90deg, #ffffff 5%, transparent 50%);
+}
+
+.row-clip::after {
+  right: 0;
+  background: linear-gradient(270deg, #ffffff 5%, transparent 50%);
+}
+
+/* room for scale + arc transforms */
+.row-pad {
+  display: flex;
+  align-items: center;
+  overflow: visible;
+}
+
+.row-clip .row-pad {
+  margin: 0;
+  overflow: visible;
+}
+
+/* arc room without adding gap between rows */
+.row-clip.top .row-pad {
+  padding: 70px 0 0;
+}
+
+.row-clip.middle .row-pad {
+  padding: 0;
+  position: relative;
+}
+
+.row-clip.bottom .row-pad {
+  padding: 0 0 70px;
+}
+
+.row-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  overflow: visible;
+  will-change: transform;
+}
+
+.card {
+  flex-shrink: 0;
+  width: 296px;
+  height: 296px;
+  border-radius: 68px;
+  overflow: hidden;
+  transform-origin: center center;
+  will-change: transform;
+  /* background: #0a0a0a; */
+  cursor: pointer;
+}
+
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+  background: rgba(5, 10, 16, 0.74);
+  backdrop-filter: blur(26px) saturate(0.7);
+  -webkit-backdrop-filter: blur(26px) saturate(0.7);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+
+.detail-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.detail-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(92vw, 440px);
+  color: #fff;
+  text-align: center;
+  transform: translateY(18px) scale(0.96);
+  transition: transform 300ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+
+.detail-overlay.is-open .detail-panel {
+  transform: translateY(0) scale(1);
+}
+
+.detail-image-wrap {
+  width: min(72vw, 340px);
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.4);
+}
+
+.detail-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.detail-labels {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.detail-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.detail-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.detail-time {
+  color: rgba(255, 255, 255, 0.42);
+  font-weight: 600;
+}
+
+.reaction-list {
+  display: grid;
+  grid-template-columns: repeat(6, 22px);
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.reaction-button {
+  width: 50px;
+  height: 50px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  font-size: 27px;
+  line-height: 1;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.reaction-button .svg-icon,
+.detail-close .svg-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  margin: auto;
+}
+
+.reaction-button:nth-child(1) { grid-column: 1 / 3; }
+.reaction-button:nth-child(2) { grid-column: 3 / 5; }
+.reaction-button:nth-child(3) { grid-column: 5 / 7; }
+
+.reaction-button:nth-child(4) {
+  grid-column: 2 / 4;
+}
+
+.reaction-button:nth-child(5) {
+  grid-column: 4 / 6;
+}
+
+.reaction-button:hover,
+.reaction-button:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-3px) scale(1.06);
+  outline: none;
+}
+
+.detail-close {
+  position: fixed;
+  top: 26px;
+  right: 28px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.detail-close:hover,
+.detail-close:focus-visible {
+  color: #fff;
+  transform: scale(1.08);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .detail-image-wrap {
+    width: min(80vw, 360px);
+  }
+
+  .detail-labels {
+    margin-top: 16px;
+  }
+
+  .reaction-list {
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .reaction-button {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+.reaction-particle {
+  position: fixed;
+  z-index: 1001;
+  left: var(--x);
+  top: var(--y);
+  color: #fff;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: reaction-float var(--duration) ease-out forwards;
+}
+
+.reaction-particle .svg-icon {
+  width: var(--size);
+  height: var(--size);
+  display: block;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.28));
+}
+
+body.reaction-glow::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 80, 0, 0.26), transparent 60%);
+  animation: page-glow 900ms ease-out forwards;
+}
+
+body.reaction-shake {
+  animation: page-shake 460ms ease both;
+}
+
+@keyframes reaction-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.45) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.4) rotate(var(--rot));
+  }
+}
+
+@keyframes page-glow {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes page-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-8px, 4px, 0); }
+  40% { transform: translate3d(7px, -4px, 0); }
+  60% { transform: translate3d(-5px, 3px, 0); }
+  80% { transform: translate3d(4px, -2px, 0); }
+}
+
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var stage = document.getElementById('stage');
+
+  var sliderData = {
+    settings: {
+      gap: 14,
+      cardSize: 296,
+      imageGridRadius: 88,
+      cardBackground: '',
+      imageLoading: 'lazy',
+      imagesPerRow: 20,
+      repeatCount: 2,
+      rowGap: 0,
+      rowOverlap: 90,
+      drag: {
+        momentumFriction: 0.90,
+        velocitySmoothing: 0.22,
+        minMomentumVelocity: 8,
+        maxMomentumVelocity: 1600,
+        clickMaxDistance: 8,
+        springStrength: 18,
+        springDamping: 0.86,
+        dragFollowStrength: 32,
+        settleEpsilon: 0.08
+      },
+      overlay: {
+        labels: ['wildpetal.co', '2h'],
+        closeLabel: 'Close image detail',
+        reactions: [
+          { icon: 'laugh', name: 'laugh', particleIcon: 'laugh', color: '#ffd166', count: 18 },
+          { icon: 'heart', name: 'love', particleIcon: 'heart', color: '#ff4d6d', count: 24 },
+          { icon: 'starEyes', name: 'adore', particleIcon: 'sparkle', color: '#ffbe0b', count: 28 },
+          { icon: 'flame', name: 'fire', particleIcon: 'flame', color: '#ff6b35', count: 22 },
+          { icon: 'party', name: 'party', particleIcon: 'party', color: '#9b5de5', count: 34 }
+        ]
+      }
+    },
+    images: [
+      { key: 'forest-ridge', src: 'https://picsum.photos/id/1011/800/800', alt: 'Forest ridge above a valley' },
+      { key: 'mountain-road', src: 'https://picsum.photos/id/1027/800/800', alt: 'Mountain road portrait' },
+      { key: 'beach-cliffs', src: 'https://picsum.photos/id/1005/800/800', alt: 'Beach cliffs at sunset' },
+      { key: 'river-canyon', src: 'https://picsum.photos/id/1035/800/800', alt: 'River canyon landscape' },
+      { key: 'misty-hills', src: 'https://picsum.photos/id/1015/800/800', alt: 'Misty hills and trees' },
+      { key: 'desert-sky', src: 'https://picsum.photos/id/1025/800/800', alt: 'Desert sky and horizon' },
+      { key: 'snow-peak', src: 'https://picsum.photos/id/1039/800/800', alt: 'Snow covered mountain peak' },
+      { key: 'green-lake', src: 'https://picsum.photos/id/1020/800/800', alt: 'Green lake and rocks' },
+      { key: 'forest-path', src: 'https://picsum.photos/id/1032/800/800', alt: 'Forest walking path' },
+      { key: 'coastal-hill', src: 'https://picsum.photos/id/1036/800/800', alt: 'Coastal hill landscape' },
+      { key: 'wooded-valley', src: 'https://picsum.photos/id/1038/800/800', alt: 'Wooded valley' },
+      { key: 'ocean-rocks', src: 'https://picsum.photos/id/1060/800/800', alt: 'Ocean rocks and waves' },
+      { key: 'autumn-water', src: 'https://picsum.photos/id/1061/800/800', alt: 'Autumn water scene' },
+      { key: 'highland-trail', src: 'https://picsum.photos/id/1062/800/800', alt: 'Highland trail' },
+      { key: 'golden-field', src: 'https://picsum.photos/id/1074/800/800', alt: 'Golden field' },
+      { key: 'rocky-coast', src: 'https://picsum.photos/id/1070/800/800', alt: 'Rocky coast' },
+      { key: 'pine-ridge', src: 'https://picsum.photos/id/1072/800/800', alt: 'Pine ridge' },
+      { key: 'sunny-hillside', src: 'https://picsum.photos/id/1040/800/800', alt: 'Sunny hillside' },
+      { key: 'blue-water', src: 'https://picsum.photos/id/1043/800/800', alt: 'Blue water landscape' },
+      { key: 'quiet-lake', src: 'https://picsum.photos/id/1044/800/800', alt: 'Quiet lake' },
+      { key: 'mountain-lake', src: 'https://picsum.photos/id/1045/800/800', alt: 'Mountain lake' },
+      { key: 'city-bridge', src: 'https://picsum.photos/id/1080/800/800', alt: 'City bridge' },
+      { key: 'evening-street', src: 'https://picsum.photos/id/1084/800/800', alt: 'Evening street' },
+      { key: 'green-woods', src: 'https://picsum.photos/id/1082/800/800', alt: 'Green woods' },
+      { key: 'open-road', src: 'https://picsum.photos/id/1081/800/800', alt: 'Open road' },
+      { key: 'quiet-forest', src: 'https://picsum.photos/id/1083/800/800', alt: 'Quiet forest' },
+      { key: 'stone-path', src: 'https://picsum.photos/id/1021/800/800', alt: 'Stone path' },
+      { key: 'sunlit-trees', src: 'https://picsum.photos/id/1022/800/800', alt: 'Sunlit trees' },
+      { key: 'blue-mountain', src: 'https://picsum.photos/id/1023/800/800', alt: 'Blue mountain' },
+      { key: 'river-stones', src: 'https://picsum.photos/id/1024/800/800', alt: 'River stones' },
+      { key: 'foggy-shore', src: 'https://picsum.photos/id/1026/800/800', alt: 'Foggy shore' }
+    ],
+    rows: [
+      {
+        type: 'top',
+        className: 'top',
+        initialOffset: 0,
+        durationSec: 400,
+        direction: -1,
+        scaleMin: 0.30,
+        scaleMax: 0.80,
+        arc: 52,
+        zBase: 300
+      },
+      {
+        type: 'middle',
+        className: 'middle',
+        initialOffset: -0.5,
+        durationSec: 400,
+        direction: 1,
+        scaleMin: 0.36,
+        scaleMax: 0.92,
+        arc: 0,
+        zBase: 100
+      },
+      {
+        type: 'bottom',
+        className: 'bottom',
+        initialOffset: 0,
+        durationSec: 400,
+        direction: -1,
+        scaleMin: 0.30,
+        scaleMax: 0.80,
+        arc: 52,
+        zBase: 300
+      }
+    ]
+  };
+
+  function bell(dist) {
+    return Math.pow(Math.cos(Math.min(1, dist) * Math.PI * 0.5), 1.35);
+  }
+
+  function shuffleImages(images) {
+    var shuffled = images.slice();
+    var i, j, temp;
+
+    for (i = shuffled.length - 1; i > 0; i--) {
+      j = Math.floor(Math.random() * (i + 1));
+      temp = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = temp;
+    }
+
+    return shuffled;
+  }
+
+  function getRowImages() {
+    var targetCount = sliderData.settings.imagesPerRow;
+    var selected = [];
+    var shuffled = [];
+    var index = 0;
+
+    while (selected.length < targetCount) {
+      if (index >= shuffled.length) {
+        shuffled = shuffleImages(sliderData.images);
+        index = 0;
+      }
+
+      selected.push(shuffled[index]);
+      index++;
+    }
+
+    return selected;
+  }
+
+  function buildRow(track) {
+    var rowImages = getRowImages();
+    var frag = document.createDocumentFragment();
+    var cards = [];
+    var i, image, card, img;
+
+    for (i = 0; i < rowImages.length * sliderData.settings.repeatCount; i++) {
+      image = rowImages[i % rowImages.length];
+      card = document.createElement('div');
+      card.className = 'card';
+      card.style.width = sliderData.settings.cardSize + 'px';
+      card.style.height = sliderData.settings.cardSize + 'px';
+      card.style.borderRadius = sliderData.settings.imageGridRadius + 'px';
+      card.style.background = sliderData.settings.cardBackground;
+      card.__imageData = image;
+      img = document.createElement('img');
+      img.src = image.src;
+      img.alt = image.alt;
+      img.loading = sliderData.settings.imageLoading;
+      card.appendChild(img);
+      frag.appendChild(card);
+      cards.push(card);
+    }
+
+    track.appendChild(frag);
+    return cards;
+  }
+
+  function layoutRow(rowConfig, cards) {
+    var rect = stage.getBoundingClientRect();
+    var centerX = rect.left + rect.width * 0.5;
+    var half = rect.width * 0.48;
+    var base = sliderData.settings.cardSize;
+    var i, card, box, cx, dist, t, scale, ty, spread;
+
+    for (i = 0; i < cards.length; i++) {
+      card = cards[i];
+      box = card.getBoundingClientRect();
+      cx = box.left + box.width * 0.5;
+      dist = Math.min(1, Math.abs(cx - centerX) / half);
+      t = bell(dist);
+
+      scale = rowConfig.scaleMin + t * (rowConfig.scaleMax - rowConfig.scaleMin);
+
+      if (rowConfig.type === 'top') {
+        ty = rowConfig.arc * (dist * dist - t);
+      } else if (rowConfig.type === 'bottom') {
+        ty = rowConfig.arc * (t - dist * dist);
+      } else {
+        ty = 0;
+      }
+
+      spread = (base * (1 - scale)) * -0.5;
+
+      card.style.marginLeft = spread + 'px';
+      card.style.marginRight = spread + 'px';
+      card.style.transform = 'translateY(' + ty + 'px) scale(' + scale + ')';
+      card.style.zIndex = String(rowConfig.zBase + Math.round(t * 80));
+    }
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function createSvgIcon(name) {
+    var icons = {
+      close: '<path d="M6 6l12 12M18 6L6 18" />',
+      heart: '<path d="M12 21s-7.5-4.6-9.4-9.2C1 7.8 3.4 4.5 7 4.5c2 0 3.4 1 5 2.8 1.6-1.8 3-2.8 5-2.8 3.6 0 6 3.3 4.4 7.3C19.5 16.4 12 21 12 21z" />',
+      flame: '<path d="M13.1 2.6c.8 3.7-2 5.4-3.8 7.8-1.4 1.8-1.6 4 .1 5.7-.1-2 .9-3.7 2.5-4.8 3.1 2 4.7 4.3 3.7 7.2-.6 1.7-2.2 3-3.8 3-4.5 0-7.4-3-7.4-7.3 0-3.8 2.7-6.4 5.1-8.8 1.1-1.1 2-2.1 2.3-3.2.1-.4.7-.3 1.3.4z" />',
+      sparkle: '<path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9L19 15z" />',
+      party: '<path d="M4 20l4.2-14 9.8 9.8L4 20z" /><path d="M9 7l8 8M12 4c2 0 3-1 3-3M17 7c2.2 0 3.5 1.2 4 3M17 3l2-2M21 14l2-1" />',
+      laugh: '<circle cx="12" cy="12" r="9" /><path d="M8 10h.1M16 10h.1M7.8 14.2c1.1 2 2.5 3 4.2 3s3.1-1 4.2-3H7.8z" /><path d="M6.3 8.1l3 1.1M17.7 8.1l-3 1.1" />',
+      starEyes: '<circle cx="12" cy="12" r="9" /><path d="M8 6.8l.7 1.5 1.6.2-1.2 1.1.3 1.6L8 10.4l-1.4.8.3-1.6-1.2-1.1 1.6-.2L8 6.8zM16 6.8l.7 1.5 1.6.2-1.2 1.1.3 1.6-1.4-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2L16 6.8zM8 15c1 1.4 2.3 2.1 4 2.1s3-.7 4-2.1" />'
+    };
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
+    svg.setAttribute('class', 'svg-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = icons[name] || icons.sparkle;
+
+    if (name === 'heart' || name === 'flame') {
+      svg.setAttribute('fill', 'currentColor');
+      svg.setAttribute('stroke-width', '1.5');
+    }
+
+    return svg;
+  }
+
+  function getRowMarginBottom() {
+    var gap = clamp(sliderData.settings.rowGap, 0, 100);
+    return -(sliderData.settings.rowOverlap - gap);
+  }
+
+  function renderRow(rowConfig, rowIndex) {
+    var clip = document.createElement('div');
+    var pad = document.createElement('div');
+    var track = document.createElement('div');
+
+    clip.className = 'row-clip ' + rowConfig.className;
+    clip.dataset.row = rowConfig.type;
+    clip.style.marginBottom = rowIndex < sliderData.rows.length - 1
+      ? getRowMarginBottom() + 'px'
+      : '0px';
+    pad.className = 'row-pad';
+    track.className = 'row-track';
+    track.style.gap = sliderData.settings.gap + 'px';
+
+    pad.appendChild(track);
+    clip.appendChild(pad);
+    stage.appendChild(clip);
+
+    return {
+      config: rowConfig,
+      type: rowConfig.type,
+      clip: clip,
+      track: track,
+      cards: buildRow(track),
+      stepSize: sliderData.settings.cardSize + sliderData.settings.gap,
+      loopWidth: 0,
+      scrollX: 0,
+      renderedScrollX: 0,
+      springVelocity: 0,
+      autoVelocity: 0,
+      momentumVelocity: 0,
+      dragging: false,
+      dragStartX: 0,
+      dragStartScroll: 0,
+      dragStartCard: null,
+      lastDragX: 0,
+      lastDragTime: 0,
+      viewportWidth: stage.clientWidth || window.innerWidth || 1
+    };
+  }
+
+  function renderSlider() {
+    stage.textContent = '';
+    return sliderData.rows.map(renderRow);
+  }
+
+  var rows = renderSlider();
+
+  var detailOverlay = createDetailOverlay();
+  var activeImage = null;
+
+  function createDetailOverlay() {
+    var overlayConfig = sliderData.settings.overlay;
+    var overlay = document.createElement('div');
+    var panel = document.createElement('div');
+    var imageWrap = document.createElement('div');
+    var image = document.createElement('img');
+    var labels = document.createElement('div');
+    var avatar = document.createElement('img');
+    var author = document.createElement('span');
+    var time = document.createElement('span');
+    var reactions = document.createElement('div');
+    var close = document.createElement('button');
+
+    overlay.className = 'detail-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    panel.className = 'detail-panel';
+    imageWrap.className = 'detail-image-wrap';
+    imageWrap.style.borderRadius = sliderData.settings.imageGridRadius + 'px';
+    image.className = 'detail-image';
+    labels.className = 'detail-labels';
+    avatar.className = 'detail-avatar';
+    author.className = 'detail-label';
+    time.className = 'detail-time';
+    author.textContent = overlayConfig.labels[0] || '';
+    time.textContent = overlayConfig.labels[1] || '';
+    reactions.className = 'reaction-list';
+    close.className = 'detail-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', overlayConfig.closeLabel);
+    close.appendChild(createSvgIcon('close'));
+
+    overlayConfig.reactions.forEach(function (reaction) {
+      var button = document.createElement('button');
+      button.className = 'reaction-button';
+      button.type = 'button';
+      button.style.color = reaction.color;
+      button.appendChild(createSvgIcon(reaction.icon));
+      button.setAttribute('aria-label', reaction.name + ' reaction');
+      button.addEventListener('click', function () {
+        playReaction(reaction);
+      });
+      reactions.appendChild(button);
+    });
+
+    imageWrap.appendChild(image);
+    labels.appendChild(avatar);
+    labels.appendChild(author);
+    labels.appendChild(time);
+    panel.appendChild(imageWrap);
+    panel.appendChild(labels);
+    panel.appendChild(reactions);
+    overlay.appendChild(panel);
+    overlay.appendChild(close);
+    document.body.appendChild(overlay);
+
+    overlay._image = image;
+    overlay._labels = labels;
+    overlay._avatar = avatar;
+    overlay._author = author;
+    overlay._time = time;
+    close.addEventListener('click', closeDetailOverlay);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeDetailOverlay();
+    });
+
+    return overlay;
+  }
+
+  function openDetailOverlay(image) {
+    if (!image) return;
+    activeImage = image;
+    detailOverlay._image.src = image.src;
+    detailOverlay._image.alt = image.alt;
+    detailOverlay._avatar.src = image.src;
+    detailOverlay._avatar.alt = '';
+    detailOverlay._author.textContent = sliderData.settings.overlay.labels[0] || '';
+    detailOverlay._time.textContent = sliderData.settings.overlay.labels[1] || '';
+
+    detailOverlay.classList.add('is-open');
+    detailOverlay.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeDetailOverlay() {
+    activeImage = null;
+    detailOverlay.classList.remove('is-open');
+    detailOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  function playReaction(reaction) {
+    var i, particle;
+
+    document.body.classList.remove('reaction-glow', 'reaction-shake');
+    if (reaction.name === 'fire') {
+      document.body.classList.add('reaction-glow');
+      window.setTimeout(function () { document.body.classList.remove('reaction-glow'); }, 900);
+    }
+
+    for (i = 0; i < reaction.count; i++) {
+      particle = document.createElement('span');
+      particle.className = 'reaction-particle';
+      particle.style.color = reaction.color;
+      particle.appendChild(createSvgIcon(reaction.particleIcon));
+      particle.style.setProperty('--x', (8 + Math.random() * 84) + 'vw');
+      particle.style.setProperty('--y', (36 + Math.random() * 38) + 'vh');
+      particle.style.setProperty('--dx', (-220 + Math.random() * 440) + 'px');
+      particle.style.setProperty('--dy', (-360 - Math.random() * 280) + 'px');
+      particle.style.setProperty('--rot', (-60 + Math.random() * 120) + 'deg');
+      particle.style.setProperty('--size', (22 + Math.random() * 28) + 'px');
+      particle.style.setProperty('--duration', (900 + Math.random() * 700) + 'ms');
+      document.body.appendChild(particle);
+      particle.addEventListener('animationend', function () {
+        this.remove();
+      });
+    }
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && activeImage) {
+      closeDetailOverlay();
+    }
+  });
+
+  function measureLoopWidth(track) {
+    var kids = track.children;
+    var half = kids.length / 2;
+    if (!half) return track.scrollWidth / 2;
+    return kids[half].offsetLeft - kids[0].offsetLeft;
+  }
+
+  var scrollReady = false;
+
+  function initScroll() {
+    rows.forEach(function (r) {
+      var w = measureLoopWidth(r.track);
+      if (!w) return;
+      r.loopWidth = w;
+
+      if (!scrollReady && r.config.initialOffset) {
+        r.scrollX = r.loopWidth * r.config.initialOffset;
+      }
+
+      wrapScroll(r, false);
+      r.renderedScrollX = r.scrollX;
+      r.springVelocity = 0;
+      r.viewportWidth = stage.clientWidth || window.innerWidth || 1;
+
+      r.autoVelocity = (r.loopWidth / r.config.durationSec) * r.config.direction;
+      applyTrackX(r);
+    });
+    scrollReady = true;
+  }
+
+  function applyTrackX(r) {
+    r.track.style.transform = 'translateX(' + r.renderedScrollX + 'px)';
+  }
+
+  /* keep scroll in (-loopWidth, 0] — seamless infinite loop */
+  function wrapScroll(r, adjustDrag) {
+    if (r.loopWidth <= 0) return;
+    while (r.scrollX <= -r.loopWidth) {
+      r.scrollX += r.loopWidth;
+      if (adjustDrag) r.dragStartScroll += r.loopWidth;
+    }
+    while (r.scrollX > 0) {
+      r.scrollX -= r.loopWidth;
+      if (adjustDrag) r.dragStartScroll -= r.loopWidth;
+    }
+  }
+
+  /* per-row drag */
+  function bindRowDrag(r) {
+    var dragConfig = sliderData.settings.drag;
+
+    function onDown(e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      r.dragging = true;
+      r.dragStartX = e.clientX;
+      r.dragStartScroll = r.scrollX;
+      r.dragStartCard = e.target.closest ? e.target.closest('.card') : null;
+      r.lastDragX = e.clientX;
+      r.lastDragTime = performance.now();
+      r.momentumVelocity = 0;
+      r.clip.classList.add('is-dragging');
+      r.clip.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    }
+
+    function onMove(e) {
+      var now, dt, dx, nextVelocity;
+
+      if (!r.dragging) return;
+      now = performance.now();
+      dt = Math.max((now - r.lastDragTime) / 1000, 0.001);
+      dx = e.clientX - r.lastDragX;
+      nextVelocity = dx / dt;
+
+      r.scrollX = r.dragStartScroll + (e.clientX - r.dragStartX);
+      r.momentumVelocity += (nextVelocity - r.momentumVelocity) * dragConfig.velocitySmoothing;
+      r.momentumVelocity = clamp(
+        r.momentumVelocity,
+        -dragConfig.maxMomentumVelocity,
+        dragConfig.maxMomentumVelocity
+      );
+      r.lastDragX = e.clientX;
+      r.lastDragTime = now;
+      wrapScroll(r, true);
+      e.preventDefault();
+    }
+
+    function onUp(e) {
+      var totalDrag;
+      var selectedImage;
+
+      if (!r.dragging) return;
+      totalDrag = Math.abs(e.clientX - r.dragStartX);
+      r.dragging = false;
+      r.clip.classList.remove('is-dragging');
+      if (Math.abs(r.momentumVelocity) < dragConfig.minMomentumVelocity) {
+        r.momentumVelocity = 0;
+      }
+      wrapScroll(r, false);
+      try { r.clip.releasePointerCapture(e.pointerId); } catch (err) {}
+
+      if (r.dragStartCard && totalDrag <= dragConfig.clickMaxDistance) {
+        selectedImage = r.dragStartCard.__imageData;
+        window.setTimeout(function () {
+          openDetailOverlay(selectedImage);
+        }, 0);
+      }
+
+      r.dragStartCard = null;
+    }
+
+    r.clip.addEventListener('pointerdown', onDown);
+    r.clip.addEventListener('pointermove', onMove);
+    r.clip.addEventListener('pointerup', onUp);
+    r.clip.addEventListener('pointercancel', onUp);
+  }
+
+  rows.forEach(bindRowDrag);
+
+  var lastTime = 0;
+
+  function updateRenderedScroll(r, dt) {
+    var dragConfig = sliderData.settings.drag;
+    var diff = getShortestLoopDelta(r, r.renderedScrollX, r.scrollX);
+    var springStrength = r.dragging ? dragConfig.dragFollowStrength : dragConfig.springStrength;
+
+    r.springVelocity += diff * springStrength * dt;
+    r.springVelocity *= Math.pow(dragConfig.springDamping, dt * 60);
+    r.renderedScrollX += r.springVelocity * dt;
+
+    if (Math.abs(diff) < dragConfig.settleEpsilon && Math.abs(r.springVelocity) < dragConfig.settleEpsilon) {
+      r.renderedScrollX = r.scrollX;
+      r.springVelocity = 0;
+    }
+
+    wrapRenderedScroll(r);
+    applyTrackX(r);
+  }
+
+  function wrapRenderedScroll(r) {
+    if (r.loopWidth <= 0) return;
+    while (r.renderedScrollX <= -r.loopWidth) {
+      r.renderedScrollX += r.loopWidth;
+    }
+    while (r.renderedScrollX > 0) {
+      r.renderedScrollX -= r.loopWidth;
+    }
+  }
+
+  function getShortestLoopDelta(r, fromX, toX) {
+    var delta = toX - fromX;
+
+    if (r.loopWidth <= 0) return delta;
+    if (delta > r.loopWidth * 0.5) delta -= r.loopWidth;
+    if (delta < -r.loopWidth * 0.5) delta += r.loopWidth;
+
+    return delta;
+  }
+
+  function tick(time) {
+    var dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
+    lastTime = time;
+
+    rows.forEach(function (r) {
+      if (!r.dragging) {
+        r.scrollX += (r.autoVelocity + r.momentumVelocity) * dt;
+        r.momentumVelocity *= Math.pow(sliderData.settings.drag.momentumFriction, dt * 60);
+        if (Math.abs(r.momentumVelocity) < sliderData.settings.drag.minMomentumVelocity) {
+          r.momentumVelocity = 0;
+        }
+        wrapScroll(r);
+      }
+
+      updateRenderedScroll(r, dt);
+    });
+
+    rows.forEach(function (r) {
+      layoutRow(r.config, r.cards);
+    });
+
+    requestAnimationFrame(tick);
+  }
+
+  initScroll();
+  window.addEventListener('load', initScroll);
+
+  rows.forEach(function (r) {
+    r.track.querySelectorAll('img').forEach(function (img) {
+      img.addEventListener('load', initScroll);
+    });
+  });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    var ro = new ResizeObserver(initScroll);
+    rows.forEach(function (r) { ro.observe(r.track); });
+  }
+
+  requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>
