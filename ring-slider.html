@@ -569,50 +569,6 @@ body.reaction-shake {
     row.renderedScrollX -= offset;
     if (row.dragging) row.dragStartScroll -= offset;
   }
-  function recycleCards(row) {
-  if (!row.cards.length) return;
-
-  var cardWidth = row.stepSize;
-  var x = getDisplayScroll(row);
-
-  // moving left
-  while (-x > cardWidth) {
-    var first = row.track.firstElementChild;
-
-    row.track.appendChild(first);
-
-    row.cards.push(row.cards.shift());
-
-    row.scrollX += cardWidth;
-    row.renderedScrollX += cardWidth;
-
-    if (row.dragging) {
-      row.dragStartScroll += cardWidth;
-    }
-  }
-
-  // moving right
-  while (x > 0) {
-    var last = row.track.lastElementChild;
-
-    row.track.insertBefore(
-      last,
-      row.track.firstElementChild
-    );
-
-    row.cards.unshift(
-      row.cards.pop()
-    );
-
-    row.scrollX -= cardWidth;
-    row.renderedScrollX -= cardWidth;
-
-    if (row.dragging) {
-      row.dragStartScroll -= cardWidth;
-    }
-  }
-}
-
 
   function measureRowTrackOrigin(row) {
     row.baseTrackLeft = row.track.getBoundingClientRect().left - getDisplayScroll(row);
