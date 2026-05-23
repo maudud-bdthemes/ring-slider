@@ -394,8 +394,8 @@ body.reaction-shake {
       imageGridRadius: 88,
       cardBackground: '',
       imageLoading: 'lazy',
-      imagesPerRow: 20,
-      repeatCount: 2,
+      imagesPerRow: 30,
+      repeatCount: 4,
       rowGap: 0,
       rowOverlap: 90,
       drag: {
@@ -569,6 +569,50 @@ body.reaction-shake {
     row.renderedScrollX -= offset;
     if (row.dragging) row.dragStartScroll -= offset;
   }
+  function recycleCards(row) {
+  if (!row.cards.length) return;
+
+  var cardWidth = row.stepSize;
+  var x = getDisplayScroll(row);
+
+  // moving left
+  while (-x > cardWidth) {
+    var first = row.track.firstElementChild;
+
+    row.track.appendChild(first);
+
+    row.cards.push(row.cards.shift());
+
+    row.scrollX += cardWidth;
+    row.renderedScrollX += cardWidth;
+
+    if (row.dragging) {
+      row.dragStartScroll += cardWidth;
+    }
+  }
+
+  // moving right
+  while (x > 0) {
+    var last = row.track.lastElementChild;
+
+    row.track.insertBefore(
+      last,
+      row.track.firstElementChild
+    );
+
+    row.cards.unshift(
+      row.cards.pop()
+    );
+
+    row.scrollX -= cardWidth;
+    row.renderedScrollX -= cardWidth;
+
+    if (row.dragging) {
+      row.dragStartScroll -= cardWidth;
+    }
+  }
+}
+
 
   function measureRowTrackOrigin(row) {
     row.baseTrackLeft = row.track.getBoundingClientRect().left - getDisplayScroll(row);
@@ -723,8 +767,8 @@ body.reaction-shake {
       stepSize: sliderData.settings.cardSize + sliderData.settings.gap,
       loopWidth: 0,
       baseTrackLeft: 0,
-      scrollX: 0,
-      renderedScrollX: 0,
+      scrollX: -1000,
+      renderedScrollX: -1000,
       springVelocity: 0,
       autoVelocity: 0,
       momentumVelocity: 0,
